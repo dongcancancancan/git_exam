@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitExam — GitHub Repository Analyzer</title>
+  <script src="https://cdn.plot.ly/plotly-3.0.1.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+    header {
+      text-align: center; padding: 48px 0 32px;
+    }
+    header h1 {
+      font-size: 2.4rem; font-weight: 800;
+      background: linear-gradient(135deg, #6366f1, #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p { color: #8b949e; margin-top: 8px; font-size: 1rem; }
+
+    .search-box {
+      display: flex; gap: 10px; max-width: 620px; margin: 0 auto 40px;
+    }
+    .search-box input {
+      flex: 1; padding: 14px 18px; border-radius: 12px;
+      border: 1px solid #30363d; background: #161b22;
+      color: #e6edf3; font-size: 1rem; outline: none;
+      transition: border-color .2s;
+    }
+    .search-box input:focus { border-color: #6366f1; }
+    .search-box input::placeholder { color: #484f58; }
+    .search-box button {
+      padding: 14px 28px; border-radius: 12px; border: none;
+      background: #6366f1; color: #fff; font-size: 1rem;
+      font-weight: 600; cursor: pointer; transition: background .2s;
+    }
+    .search-box button:hover { background: #5558e6; }
+    .search-box button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .spinner {
+      display: none; margin: 0 auto 32px;
+      width: 36px; height: 36px; border: 3px solid #30363d;
+      border-top-color: #6366f1; border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-box {
+      display: none; max-width: 620px; margin: 0 auto 24px;
+      padding: 14px 18px; border-radius: 10px;
+      background: rgba(248, 81, 73, .12); border: 1px solid rgba(248, 81, 73, .3);
+      color: #f85149;
+    }
+
+    .dashboard { display: none; }
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px; margin-bottom: 28px;
+    }
+    .stat-card {
+      background: #161b22; border: 1px solid #21262d;
+      border-radius: 12px; padding: 18px 16px; text-align: center;
+    }
+    .stat-card .value {
+      font-size: 1.8rem; font-weight: 700;
+      background: linear-gradient(135deg, #6366f1, #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .stat-card .label { color: #8b949e; font-size: .85rem; margin-top: 4px; }
+
+    .charts-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 18px;
+      margin-bottom: 28px;
+    }
+    .chart-card {
+      background: #161b22; border: 1px solid #21262d;
+      border-radius: 14px; padding: 18px;
+    }
+    .chart-card.full-width { grid-column: 1 / -1; }
+    .chart-card h3 { color: #8b949e; font-size: .95rem; font-weight: 600; margin-bottom: 8px; }
+
+    .repo-info {
+      background: #161b22; border: 1px solid #21262d;
+      border-radius: 14px; padding: 22px; margin-bottom: 28px;
+      display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start;
+    }
+    .repo-info h2 { font-size: 1.5rem; color: #e6edf3; }
+    .repo-info h2 a { color: inherit; text-decoration: none; }
+    .repo-info h2 a:hover { color: #6366f1; }
+    .repo-info .desc { color: #8b949e; margin-top: 8px; line-height: 1.6; }
+    .repo-info .meta { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; }
+    .repo-info .meta span {
+      font-size: .82rem; color: #8b949e;
+      background: #21262d; padding: 4px 10px; border-radius: 20px;
+    }
+    .score-section { text-align: center; }
+
+    .verdict-box {
+      background: linear-gradient(135deg, rgba(99,102,241,.12), rgba(139,92,246,.12));
+      border: 1px solid rgba(99,102,241,.25);
+      border-radius: 12px; padding: 20px; margin-bottom: 28px;
+    }
+    .verdict-box .grade {
+      font-size: 3.5rem; font-weight: 900; text-align: center;
+      background: linear-gradient(135deg, #6366f1, #c4b5fd);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .verdict-box .text { color: #c0c0c0; text-align: center; margin-top: 8px; line-height: 1.6; }
+
+    footer {
+      text-align: center; color: #484f58; padding: 32px 0;
+      font-size: .82rem;
+    }
+
+    @media (max-width: 700px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      header h1 { font-size: 1.8rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>GitExam</h1>
+      <p>Enter a public GitHub repo URL to analyze it with AI-powered scoring</p>
+    </header>
+
+    <form class="search-box" id="searchForm">
+      <input type="text" id="urlInput"
+             placeholder="https://github.com/owner/repo"
+             autocomplete="off">
+      <button type="submit" id="submitBtn">Analyze</button>
+    </form>
+
+    <div class="spinner" id="spinner"></div>
+    <div class="error-box" id="errorBox"></div>
+
+    <div class="dashboard" id="dashboard"></div>
+  </div>
+  <footer>
+    Built with FastAPI &middot; Data from GitHub API (unauthenticated, rate-limited)
+  </footer>
+
+  <script>
+    const form = document.getElementById('searchForm');
+    const input = document.getElementById('urlInput');
+    const btn = document.getElementById('submitBtn');
+    const spinner = document.getElementById('spinner');
+    const errorBox = document.getElementById('errorBox');
+    const dashboard = document.getElementById('dashboard');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = input.value.trim();
+      if (!url) return;
+
+      btn.disabled = true;
+      spinner.style.display = 'block';
+      errorBox.style.display = 'none';
+      dashboard.style.display = 'none';
+
+      try {
+        const resp = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json();
+          throw new Error(err.detail || 'Unknown error');
+        }
+
+        const data = await resp.json();
+        renderDashboard(data);
+        dashboard.style.display = 'block';
+      } catch (err) {
+        errorBox.textContent = err.message;
+        errorBox.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        spinner.style.display = 'none';
+      }
+    });
+
+    function renderDashboard(data) {
+      const { repo, score, charts } = data;
+
+      dashboard.innerHTML = `
+        <div class="repo-info">
+          <div style="flex:1;min-width:260px;">
+            <h2><a href="${esc(repo.url)}" target="_blank">${esc(repo.name)}</a></h2>
+            <div class="desc">${esc(repo.description) || '<em>No description</em>'}</div>
+            <div class="meta">
+              ${repo.language ? `<span>${esc(repo.language)}</span>` : ''}
+              <span>License: ${esc(repo.license)}</span>
+              <span>Created: ${fmtDate(repo.created_at)}</span>
+              <span>Updated: ${fmtDate(repo.pushed_at)}</span>
+              ${repo.archived ? '<span style="color:#f85149;">Archived</span>' : ''}
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="value">${fmtNum(repo.stars)}</div>
+            <div class="label">Stars</div>
+          </div>
+          <div class="stat-card">
+            <div class="value">${fmtNum(repo.forks)}</div>
+            <div class="label">Forks</div>
+          </div>
+          <div class="stat-card">
+            <div class="value">${fmtNum(repo.watchers)}</div>
+            <div class="label">Watchers</div>
+          </div>
+          <div class="stat-card">
+            <div class="value">${fmtNum(repo.open_issues)}</div>
+            <div class="label">Open Issues</div>
+          </div>
+          <div class="stat-card">
+            <div class="value">${fmtNum(Object.keys(repo.language_distribution).length)}</div>
+            <div class="label">Languages</div>
+          </div>
+          <div class="stat-card">
+            <div class="value">${fmtNum(repo.contributors_count)}+</div>
+            <div class="label">Contributors</div>
+          </div>
+        </div>
+
+        <div class="verdict-box">
+          <div class="grade">${score.grade}</div>
+          <div style="font-size:1.2rem;color:#e6edf3;text-align:center;margin-bottom:4px;">
+            ${score.total} / 100
+          </div>
+          <div class="text">${esc(score.verdict)}</div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card score-section" id="chartGauge"></div>
+          <div class="chart-card score-section" id="chartRadar"></div>
+          <div class="chart-card" id="chartBars"></div>
+          <div class="chart-card" id="chartPie"></div>
+        </div>
+
+        ${repo.top_contributors.length ? `
+        <div class="charts-grid">
+          <div class="chart-card full-width">
+            <h3>Top Contributors</h3>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;">
+              ${repo.top_contributors.map(c => `
+                <div style="text-align:center;">
+                  <img src="${esc(c.avatar)}" width="44" height="44"
+                       style="border-radius:50%;background:#21262d;">
+                  <div style="font-size:.82rem;color:#e6edf3;margin-top:4px;">${esc(c.login)}</div>
+                  <div style="font-size:.72rem;color:#8b949e;">${c.contributions} commits</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>` : ''}
+      `;
+
+      // Embed Plotly charts
+      embedChart('chartGauge', charts.score_gauge);
+      embedChart('chartRadar', charts.score_radar);
+      embedChart('chartBars', charts.dim_bars);
+      embedChart('chartPie', charts.lang_pie);
+    }
+
+    function embedChart(id, html) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const plotDiv = tmp.querySelector('.plotly-graph-div, .js-plotly-plot');
+      if (plotDiv) {
+        el.appendChild(plotDiv);
+        // Re-execute Plotly.newPlot if needed
+        const scripts = tmp.querySelectorAll('script');
+        scripts.forEach(s => {
+          const ns = document.createElement('script');
+          ns.textContent = s.textContent;
+          document.body.appendChild(ns);
+          document.body.removeChild(ns);
+        });
+      }
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function fmtNum(n) { return n >= 1000 ? (n/1000).toFixed(1)+'k' : String(n); }
+    function fmtDate(d) {
+      if (!d) return 'N/A';
+      return new Date(d).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'});
+    }
+  </script>
+</body>
+</html>
