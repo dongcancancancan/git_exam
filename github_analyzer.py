@@ -18,6 +18,9 @@ async def fetch_json(client: httpx.AsyncClient, url: str) -> dict[str, Any] | No
     resp = await client.get(url)
     if resp.status_code == 404:
         return None
+    if resp.status_code == 403 and "rate limit" in (resp.text or "").lower():
+        raise RuntimeError("GitHub API rate limit exceeded (60 requests/hour). "
+                           "Set GITHUB_TOKEN in .env for 5000 requests/hour.")
     resp.raise_for_status()
     return resp.json()
 

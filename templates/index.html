@@ -191,7 +191,7 @@
     });
 
     function renderDashboard(data) {
-      const { repo, score, charts } = data;
+      const { repo, score, charts, ai_review } = data;
 
       dashboard.innerHTML = `
         <div class="repo-info">
@@ -242,6 +242,12 @@
           </div>
           <div class="text">${esc(score.verdict)}</div>
         </div>
+
+        ${ai_review ? `
+        <div class="chart-card full-width" style="margin-bottom:28px;">
+          <h3>AI Review <span style="font-weight:400;color:#6366f1;">(Powered by 火山引擎)</span></h3>
+          <div style="color:#c0c0c0;line-height:1.8;white-space:pre-wrap;margin-top:8px;">${esc(ai_review)}</div>
+        </div>` : ''}
 
         <div class="charts-grid">
           <div class="chart-card score-section" id="chartGauge"></div>

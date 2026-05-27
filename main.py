@@ -8,6 +8,7 @@ from pathlib import Path
 from github_analyzer import analyze_repo, parse_repo_url
 from scorer import score_repo
 from visualizer import language_pie, score_radar, score_gauge, dimension_bars
+from ai_review import generate_review
 
 app = FastAPI(title="GitExam — GitHub Repo Analyzer")
 
@@ -36,8 +37,11 @@ async def api_analyze(req: AnalyzeRequest):
         data = await analyze_repo(owner, repo)
     except ValueError as e:
         raise HTTPException(404, str(e))
+    except RuntimeError as e:
+        raise HTTPException(429, str(e))
 
     ai_score = score_repo(data)
+    ai_review = await generate_review(data, ai_score)
 
     charts = {
         "lang_pie": language_pie(data["language_distribution"]),
@@ -50,4 +54,5 @@ async def api_analyze(req: AnalyzeRequest):
         "repo": data,
         "score": ai_score,
         "charts": charts,
+        "ai_review": ai_review,
     }
